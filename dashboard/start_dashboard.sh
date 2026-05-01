@@ -9,4 +9,4 @@ echo "Starting dashboard server ..."
 echo "  URL:  http://192.168.1.66:8080"
 echo ""
 
-exec python3 dashboard/server.py
+exec python3 server.py

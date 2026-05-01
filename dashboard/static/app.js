@@ -1,5 +1,5 @@
 /* ==============================================================
-   Radxa Cubie A7A — Command Center  (app.js)
+   Embedded Board Dashboard  (app.js)
    Window manager + application modules
    ============================================================== */
 
@@ -511,12 +511,69 @@ updateClock();
 async function updateTaskbarInfo() {
   try {
     const d = await apiGet("/api/sysinfo");
-    document.getElementById("tb-cpu").textContent = d.cpu_temp !== null ? d.cpu_temp + " °C" : "-- °C";
-    document.getElementById("tb-mem").textContent = (d.mem_total - d.mem_avail) + " / " + d.mem_total + " MB";
+    document.getElementById("tb-cpu").textContent =
+      d.cpu_temp !== null ? d.cpu_temp + " \u00b0C" : "-- \u00b0C";
+    document.getElementById("tb-mem").textContent =
+      (d.mem_total - d.mem_avail) + " / " + d.mem_total + " MB";
   } catch {}
 }
 setInterval(updateTaskbarInfo, 5000);
 updateTaskbarInfo();
+
+/* ================ BOARD IDENTITY ================ */
+
+async function initBoardIdentity() {
+  try {
+    const d = await apiGet("/api/sysinfo");
+    const board = d.board || d.hostname || "Board Dashboard";
+    const arch  = d.arch  || "";
+    const soc   = d.soc   || "";
+
+    // Page title
+    document.title = board + " \u2014 Dashboard";
+
+    // Dock logo: first letter of each word, max 4 chars
+    const initials = board.split(/\s+/).map(w => w[0]).join("").slice(0, 4).toUpperCase();
+    const logoEl = document.getElementById("dock-logo");
+    if (logoEl) logoEl.textContent = initials;
+
+    // Taskbar board chip
+    const tbBoard = document.getElementById("tb-board");
+    if (tbBoard) tbBoard.textContent = board;
+
+    // Welcome screen board name
+    const nameEl = document.getElementById("welcome-board");
+    if (nameEl) nameEl.textContent = board;
+
+    // Welcome screen meta line: hostname · arch · soc
+    const metaEl = document.getElementById("welcome-meta");
+    if (metaEl) {
+      const parts = [d.hostname];
+      if (arch) parts.push(arch);
+      if (soc)  parts.push(soc);
+      metaEl.textContent = parts.join("  \u00b7  ");
+    }
+
+    // Fade out welcome when the first window opens
+    const welcome = document.getElementById("welcome");
+    if (welcome) {
+      const observer = new MutationObserver(() => {
+        if (document.querySelector(".window")) {
+          welcome.style.transition = "opacity 0.4s";
+          welcome.style.opacity = "0";
+          setTimeout(() => { welcome.style.display = "none"; }, 420);
+          observer.disconnect();
+        }
+      });
+      observer.observe(document.getElementById("desktop"), { childList: true });
+    }
+  } catch (e) {
+    const nameEl = document.getElementById("welcome-board");
+    if (nameEl) nameEl.textContent = "Board Dashboard";
+  }
+}
+
+initBoardIdentity();
 
 /* ---- auto-open terminal on load ---- */
 openTerminal();

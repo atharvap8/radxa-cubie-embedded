@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Radxa Cubie A7A - Dashboard Server
-====================================
-FastAPI backend serving the web-based command center.
-Provides WebSocket endpoints for terminal, IMU streaming, and debug
-logging, plus REST endpoints for file browsing, GPIO status, and
-system information.
+Embedded Board Dashboard Server
+=================================
+FastAPI backend for the browser-based board command centre.
+Serves the frontend and exposes REST and WebSocket endpoints for
+terminal access, IMU streaming, file browsing, GPIO monitoring,
+and system telemetry.  Board identity is read from hardware
+identifiers at startup so no board-specific strings are hard-coded.
 """
 
 import asyncio
@@ -40,6 +41,96 @@ try:
     IMU_AVAILABLE = True
 except Exception:
     IMU_AVAILABLE = False
+
+# ================================================================== #
+#  Board identification
+# ================================================================== #
+
+import re as _re
+
+def _detect_board() -> dict:
+    """
+    Read hardware identifiers from the running kernel and return a
+    structured description of the board.  Tries multiple sources in
+    priority order so the result is correct on any Linux SBC or PC.
+    """
+    _COMPAT_MAP = {
+        "radxa,cubie-a7a":         "Radxa Cubie A7A",
+        "radxa,rock-5b":           "Radxa ROCK 5B",
+        "radxa,rock-5a":           "Radxa ROCK 5A",
+        "radxa,rock-pi-4b":        "Radxa ROCK Pi 4B",
+        "radxa,zero":              "Radxa Zero",
+        "raspberrypi,5-model-b":   "Raspberry Pi 5 Model B",
+        "raspberrypi,4-model-b":   "Raspberry Pi 4 Model B",
+        "raspberrypi,3-model-b":   "Raspberry Pi 3 Model B",
+        "pine64,rock64":           "Pine64 ROCK64",
+        "pine64,pinebook-pro":     "Pinebook Pro",
+        "friendlyarm,nanopi-r5s":  "NanoPi R5S",
+        "orangepi,5":              "Orange Pi 5",
+    }
+    _SOC_VENDORS = {"arm", "allwinner", "amlogic", "rockchip",
+                    "mediatek", "ti", "nxp", "broadcom"}
+
+    board_name = None
+    soc_name   = None
+
+    # Source 1: /proc/device-tree/compatible (ARM/RISC-V SBCs)
+    for path in ("/proc/device-tree/compatible",
+                 "/sys/firmware/devicetree/base/compatible"):
+        try:
+            with open(path, "rb") as f:
+                raw = f.read()
+            entries = [e.strip() for e in
+                       raw.decode("utf-8", errors="replace").split("\x00")
+                       if e.strip()]
+            for entry in entries:
+                if entry in _COMPAT_MAP:
+                    board_name = _COMPAT_MAP[entry]
+                    break
+                if "," in entry and not board_name:
+                    v, m = entry.split(",", 1)
+                    if v not in _SOC_VENDORS:
+                        # Convert slug like rock-5b -> Rock 5B
+                        board_name = v.title() + " " + _re.sub(
+                            r"(?<=[a-zA-Z])(?=[0-9])", " ",
+                            m.replace("-", " ").title()
+                        )
+                if "," in entry and not soc_name:
+                    v, s = entry.split(",", 1)
+                    if v in _SOC_VENDORS:
+                        soc_name = s.upper()
+            if entries:
+                break
+        except Exception:
+            pass
+
+    # Source 2: DMI product name (x86 / some ARM laptops)
+    if not board_name:
+        for path in ("/sys/class/dmi/id/product_name",
+                     "/sys/class/dmi/id/board_name"):
+            try:
+                with open(path) as f:
+                    val = f.read().strip()
+                if val and val not in ("", "None", "System Product Name",
+                                        "To be filled by O.E.M."):
+                    board_name = val
+                    break
+            except Exception:
+                pass
+
+    hostname = os.uname().nodename
+    display  = board_name or hostname
+    if soc_name and soc_name.lower() not in display.lower():
+        display = f"{display} ({soc_name})"
+
+    return {
+        "board":    display,
+        "hostname": hostname,
+        "soc":      soc_name,
+        "arch":     os.uname().machine,
+    }
+
+_BOARD_INFO = _detect_board()
 
 # --------------- IMU singleton --------------- #
 _imu_instance = None
@@ -106,7 +197,13 @@ async def index():
 
 @app.get("/api/sysinfo")
 async def sysinfo():
-    info = {"hostname": os.uname().nodename, "imu": IMU_AVAILABLE}
+    info = {
+        "hostname": _BOARD_INFO["hostname"],
+        "board":    _BOARD_INFO["board"],
+        "soc":      _BOARD_INFO["soc"],
+        "arch":     _BOARD_INFO["arch"],
+        "imu":      IMU_AVAILABLE,
+    }
     try:
         with open("/sys/class/thermal/thermal_zone0/temp") as f:
             info["cpu_temp"] = round(int(f.read().strip()) / 1000.0, 1)

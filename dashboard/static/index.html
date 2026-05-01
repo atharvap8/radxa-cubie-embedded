@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Radxa Cubie A7A — Command Center</title>
+<title>Board Dashboard</title>
+<meta name="description" content="Web-based desktop interface for headless single-board computers. Full terminal, file access, GPIO monitoring, and sensor visualisation from any browser on the local network.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
@@ -13,7 +14,7 @@
 
 <!-- Dock (left sidebar) -->
 <nav id="dock">
-  <div class="dock-logo">R<span>7A</span></div>
+  <div class="dock-logo" id="dock-logo">SBC</div>
   <div class="dock-sep"></div>
   <button class="dock-btn" data-app="terminal" title="Terminal">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
@@ -46,12 +47,25 @@
 </nav>
 
 <!-- Desktop area -->
-<main id="desktop"></main>
+<main id="desktop">
+  <!-- Welcome screen shown before any app is opened -->
+  <div id="welcome">
+    <div id="welcome-board" class="welcome-board-name">Loading...</div>
+    <div id="welcome-sub" class="welcome-sub">
+      A desktop interface for your board, served entirely from the device itself.
+      No VNC, no remote desktop protocol, no display required. Open a terminal,
+      browse files, check GPIO states, and visualise sensor data from any browser
+      on your local network.
+    </div>
+    <div id="welcome-meta" class="welcome-meta"></div>
+  </div>
+</main>
 
 <!-- Taskbar -->
 <footer id="taskbar">
   <div id="taskbar-items"></div>
   <div id="taskbar-right">
+    <span id="tb-board" title="Board"></span>
     <span id="tb-cpu" title="CPU Temperature">-- °C</span>
     <span id="tb-mem" title="Memory">-- MB</span>
     <span id="tb-clock"></span>
