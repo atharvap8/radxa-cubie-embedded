@@ -1,0 +1,4 @@
+dashboard/venv/
+dashboard/__pycache__/
+i2c/imu/ism6hg256x/venv/
+i2c/imu/ism6hg256x/__pycache__/
